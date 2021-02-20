@@ -1,0 +1,146 @@
+---
+title: "Phone calls NetworkViz"
+author: "Rana Putta"
+date: "10/28/2020"
+output:
+data: https://github.com/kassambara/navdata
+---
+The data set is from github. The data contains information of calls that take place from one country to another country in the European Union. The data set is unidirectional i.e it shows the source of the call and the destination country. I chose this particular data set to explore which contrives have the highest calls going through them. Although this is a very small and limited set, the same analysis can be applied to larger data sets to arrive at better judgments and conclusions. In an ever growing market from communication services, telephone revolutionized the communication sector and still plays and important role in our life even after the widespread adoption of internet. 
+
+```{r setup, include=FALSE}
+library(devtools)
+library(tidyverse)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+library(navdata)
+
+devtools::install_github("kassambara/navdata")
+data("phone.call")
+head(phone.call, 3)
+```
+
+
+The main goal of this visualization is to answer some key questions: 
+1. Which country has the most outgoing calls and which country receives the highest number of calls? 
+2. Which of the countries have the highest interconnected among them? 
+3. To be able to clearly see the incoming calls and outgoing calls in and out of a country. 
+
+
+```{r distinct}
+#  Get distinct source names
+sources <- phone.call %>%
+  distinct(source) %>%
+  rename(label = source)
+
+# Get distinct destination names
+destinations <- phone.call %>%
+  distinct(destination) %>%
+  rename(label = destination)
+```
+
+
+```{r edges and nodes, echo=FALSE}
+
+# Join the two data to create node
+# Add unique ID for each country
+nodes <- full_join(sources, destinations, by = "label") 
+nodes <- nodes %>%
+mutate(id = 1:nrow(nodes)) %>%
+select(id, everything())
+head(nodes, 3)
+
+# Rename the n.call column to weight
+phone.call <- phone.call %>%
+  rename(weight = n.call)
+# (a) Join nodes id for source column
+edges <- phone.call %>% 
+  left_join(nodes, by = c("source" = "label")) %>% 
+  rename(from = id)
+# (b) Join nodes id for destination column
+edges <- edges %>% 
+  left_join(nodes, by = c("destination" = "label")) %>% 
+  rename(to = id)
+# (c) Select/keep only the columns from and to
+edges <- select(edges, from, to, weight)
+head(edges, 3)
+```
+The first question can be answered using a simple network diagram. The network diagram seemed to be the appropriate choice show how several countries connect and interact. The following network represents countries as the nodes and edges represent the flow of phone calls. You can also see the communities/clusters formed of the data. On the top we have Germany, which has several outgoing and incoming edges. 
+```{r network graph, echo=FALSE}
+library(igraph)
+net.igraph <- graph_from_data_frame(
+  d = edges, vertices = nodes, 
+  directed = TRUE
+)
+
+library(RColorBrewer)
+# Map nodes to variable cyl
+coul <- brewer.pal(nlevels(as.factor(edges$weight)), "Set2")
+
+# Map the color to cylinders
+my_color <- coul[as.numeric(as.factor(edges$weight))]
+set.seed(123)
+
+par(bg="white", mar=c(0,0,0,0))
+set.seed(4)
+plot(net.igraph, 
+     vertex.size=12,
+    # vertex.color=my_color, 
+     vertex.label.cex=1,
+     edge.arrow.size = 0.3,
+     vertex.label.color="black",
+     vertex.frame.color="black",
+     layout = layout_with_graphopt
+)
+
+text(-1.45,1.1,"Phone calls network",col="black", cex=0)
+```
+The following arc representation shows which two countries are connected. Unlike the network diagram which shows the flow of information, this representation shows connectedness in an ascending form. To the left we have countries we have countries that have the highest calls in and out and decreases as we move to the right.For example, France has the highest connections (phone calls in our case) followed by Germany. 
+```{r arc echo=FALSE}
+library(tidygraph)
+net.tidy <- tbl_graph(
+  nodes = nodes, edges = edges, directed = TRUE
+)
+
+ggraph(net.tidy, layout="linear") + 
+  geom_edge_arc(edge_colour="black", edge_alpha=0.3, edge_width=0.2) +
+  geom_node_point( color="steelblue", size=5) +
+  geom_node_text( aes(label=label), repel = FALSE, size=3.5, color="black", nudge_y=-0.1,check_overlap = TRUE) +
+  theme_void() + ggtitle("Phone calls arc diagram") + theme(plot.title = element_text(size = 10))
+  theme(
+    legend.position="none",
+    plot.margin=unit(rep(2,4), "cm"))
+    #plot.background = element_rect(fill = "black"))
+```
+The third representation is a Sankey diagram. Sankey diagram is useful in understanding and representing both the incoming and outgoing calls of each country. The following Sankey plot helps us achieve the 3rd goal. As you move the cursor along the plot, you can clearly see the inflow and outflow of phone calls. If you hover over Germany, you can see that it has 18 connections; of which 9 are incoming and 9 are outgoing.
+```{r sankey, echo=FALSE}
+library(networkD3)
+library(dplyr)
+
+# A connection data frame is a list of flows with intensity for each flow
+links <- data.frame(
+  source=phone.call$source, 
+  target=phone.call$destination, 
+  value=phone.call$weight
+)
+
+# From these flows we need to create a node data frame: it lists every entities involved in the flow
+nodes <- data.frame(
+  name=c(as.character(phone.call$source), 
+         as.character(phone.call$destination)) %>% unique()
+)
+
+# With networkD3, connection must be provided using id, not using real name like in the links dataframe.. So we need to reformat it.
+links$IDsource <- match(links$source, nodes$name)-1 
+links$IDtarget <- match(links$target, nodes$name)-1
+
+# Make the Network
+sankey <- sankeyNetwork(Links = links, Nodes = nodes,
+                   Source = "IDsource", Target = "IDtarget",
+                   Value = "value", NodeID = "name", 
+                   sinksRight=FALSE)
+sankey <- htmlwidgets::prependContent(sankey, htmltools::tags$p("Phone calls sankey"))
+sankey
+
+```
+The data set I have obtained is very limited. Applying the same analysis for a single network providers data can bring about new insights such as focusing on specific countries that see huge phone call traffic and adjusting its pricing and market accordingly.

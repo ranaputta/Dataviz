@@ -1,0 +1,81 @@
+---
+title: "ggplot 2 assignment"
+author: "Rana Putta"
+class: "FE 550 A"
+datasource: https://www.kaggle.com/geoffnel/evs-one-electric-vehicle-dataset?select=ElectricCarData_Clean.csv
+---
+
+I found this dataset on Kaggle. The dataset consists of data from several different car manufactures of electric vechicles (EV). The dataset consists of 83 brands and some brands offering more than 1 model. The dataset consists of 14 different data coloumns. 
+
+The reason why I chose this topic is because I am a car enthusiast and always loved to research about cars. EV's are relatively new to the mainstream market and are already giving Internal Combustion Engines a run for their money in terms of performace and maintance, so I though it would be interesting to explore more them. When someone finally makes the switch to a new EV it is no surprise that he/she is constantly worried about how long you can drive it aka range anxiety. Since EV's are new and have only been around for a decade, I want to compare them to see if they are really worth the heftly price tag in terms of range, efficiency and price. 
+
+The dataset has several data fields but I narrowed it down to only four field of my interest; price, drivetrain, range and efficiency. Drivetrain was the only datafield that had 3 variables and the rest had multiples of 10s. I included drivetrain later because of some interesting findings. 
+
+
+#Loading Data
+```{r message=FALSE, warning=FALSE, results='hide'}
+library(tidyverse) # includes ggplot2
+
+cardata <- read_csv("ElectricCarData_Clean.csv")
+```
+
+
+
+#Graph 1
+```{r, warning=FALSE}
+graph1 <- ggplot(cardata, aes(Efficiency_WhKm,PriceEuro)) + 
+  geom_boxplot(aes(color = PowerTrain)) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))
+
+graph1 <- graph1 + labs(title = "Comparision of Efficiency (WhKm) vs Price (€) ",
+                  subtitle = "EV Cars",
+                  caption = "Data source: Kaggle",
+                  y = "Price (€)", x = "Efficiency (WhKm)",
+                  tag = "A")
+graph1
+```
+I used a boxplot for Efficiency vs Price for the three different drivetrains. Boxplot shows clear distinction of how each powertrains efficiency differs as well as the price. It is no surprise that the AWD powertrain ends up being the least effienct among the group and also prices at the top. AWD means at least dual motors in the car and hence more motos means more cost. 
+
+
+# Graph 2
+```{r, message=FALSE, warning=FALSE}
+graph2 <- ggscatterhist(
+  cardata, x = "Range_Km", y = "PriceEuro",
+  color = "PowerTrain", size = 2, alpha = 0.6,
+  palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+  margin.params = list(fill = "PowerTrain", color = "black", size = 0.3))
+
+graph2 <- graph2 + labs(title = "Comparision of Range (Km) vs Price (€)",
+                        subtitle = "EV Cars",
+                        caption = "Data source: Kaggle",
+                        x = "Range (Km)", y = "Price (€)",
+                        tag = "B")
+graph2
+```
+In the second graph I used a scattered plot with histogram. This was from one of the demos and thought it would be appropriate here to display how the price of the cars increase as the range of the cars increase. The histogram helps in displaying a distribution of the powertrains for the corresponsings price and range.
+
+
+# Graph 3
+```{r, message=FALSE, warning=FALSE}
+mu <- cardata %>%
+  group_by(PowerTrain) %>%
+  summarise(grp.mean = mean(Efficiency_WhKm))
+
+graph3 <- ggplot(cardata, aes(Efficiency_WhKm)) +
+  geom_histogram(aes(fill = PowerTrain, color = PowerTrain), bins = 20, 
+                 position = "identity", alpha = 0.5) +
+              geom_density() +
+  geom_vline(aes(xintercept = grp.mean, color = PowerTrain),
+             data = mu, linetype = 2)+
+  scale_color_viridis_d()
+  
+ 
+graph3 <- graph3 + labs(title = "Range and PowerTrain",
+                        subtitle = "EV Cars",
+                        caption = "Data source: Kaggle",
+                        x = "Range (Km)", y = "Count",
+                        tag = "C")
+graph3
+
+```
+In this graph I mark out the average range for each of the powertrains. I used a histogram for this case because it gives out a clear layout for each of the powertrains and how they are spread across on the range. It because easy for the viewer to distinguish each of the powertrain and the corresponding range for an average car in that segment. 
